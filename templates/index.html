@@ -1,0 +1,228 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Jira Assistant</title>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600&display=swap" rel="stylesheet">
+  <style>
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+    body {
+      font-family: 'Inter', sans-serif;
+      background-color: #f0f4f8;
+      color: #333;
+      padding: 40px;
+    }
+    .container {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 40px;
+      max-width: 1200px;
+      margin: auto;
+    }
+    .card {
+      background: white;
+      padding: 30px;
+      border-radius: 12px;
+      box-shadow: 0 10px 25px rgba(0, 0, 0, 0.05);
+    }
+    h2 {
+      margin-bottom: 24px;
+      font-size: 20px;
+      color: #0d6efd;
+      text-align: center;
+    }
+    label {
+      font-weight: 600;
+      display: block;
+      margin: 16px 0 6px;
+    }
+    input[type="text"], textarea {
+      width: 100%;
+      padding: 12px 14px;
+      font-size: 15px;
+      border-radius: 8px;
+      border: 1px solid #ccc;
+      background: #f9fbfd;
+    }
+    textarea {
+      min-height: 100px;
+      resize: vertical;
+    }
+    button {
+      width: 100%;
+      margin-top: 20px;
+      background: #0d6efd;
+      color: white;
+      border: none;
+      padding: 14px;
+      font-size: 16px;
+      font-weight: 600;
+      border-radius: 8px;
+      cursor: pointer;
+      transition: background 0.3s;
+    }
+    button:hover {
+      background: #0a58ca;
+    }
+    .status-message, .results-display {
+      margin-top: 24px;
+      padding: 16px;
+      border-radius: 8px;
+      background: #f1f5f9;
+      font-family: monospace;
+      font-size: 14px;
+      white-space: pre-wrap;
+    }
+    .success { background: #d1fae5; color: #065f46; border-left: 5px solid #10b981; }
+    .error { background: #fee2e2; color: #991b1b; border-left: 5px solid #ef4444; }
+    .ticket-list { list-style: none; padding-left: 0; margin-top: 10px; }
+    .ticket-list li { margin-bottom: 6px; }
+    .ticket-list a { color: #0d6efd; text-decoration: none; }
+    .ticket-list a:hover { text-decoration: underline; }
+    .solution-output {
+      background: #e0f2fe;
+      border-left: 5px solid #0ea5e9;
+      padding: 16px;
+      border-radius: 8px;
+      font-family: monospace;
+    }
+    @media (max-width: 900px) {
+      .container {
+        grid-template-columns: 1fr;
+      }
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <div class="card">
+      <h2>📊 Jira Data Ingestion</h2>
+      <form id="ingestionForm">
+        <label for="project_key_ingest">Project Key</label>
+        <input type="text" id="project_key_ingest" name="project_key_ingest" value="LPAAS_SFL" required />
+
+        <label for="jql_query">JQL Query</label>
+        <textarea id="jql_query" name="jql_query" required>project = LPAAS_SFL AND issuetype = Bug AND status = Done ORDER BY created DESC</textarea>
+
+        <button type="submit" id="ingestButton">Ingest Data</button>
+        <div id="ingestStatus" class="status-message"></div>
+      </form>
+    </div>
+
+    <div class="card">
+      <h2>🤖 AI Assistant</h2>
+      <form id="searchForm">
+        <label for="project_key_search">Project Key (for search)</label>
+        <input type="text" id="project_key_search" name="project_key_search" value="LPAAS_SFL" required />
+
+        <label for="issue_description">Describe the Issue</label>
+        <textarea id="issue_description" name="issue_description" required placeholder="e.g., User is unable to log in..."></textarea>
+
+        <button type="submit" id="searchButton">Search & Summarize</button>
+      </form>
+
+      <div id="searchStatus" class="status-message"></div>
+
+      <h3 style="margin-top: 24px;">Similar Tickets</h3>
+      <div class="results-display">
+        <ul id="ticketList" class="ticket-list"></ul>
+      </div>
+
+      <h3 style="margin-top: 24px;">Generated Solution</h3>
+      <div id="solutionOutput" class="solution-output"></div>
+    </div>
+  </div>
+
+  <script>
+    document.getElementById('ingestionForm').addEventListener('submit', async function(event) {
+      event.preventDefault();
+      const projectKey = document.getElementById('project_key_ingest').value;
+      const jqlQuery = document.getElementById('jql_query').value;
+      const statusDiv = document.getElementById('ingestStatus');
+      const ingestButton = document.getElementById('ingestButton');
+
+      statusDiv.textContent = 'Ingesting data...';
+      statusDiv.className = 'status-message';
+      ingestButton.disabled = true;
+      ingestButton.textContent = 'Ingesting...';
+
+      try {
+        const response = await fetch('/ingest', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+          body: new URLSearchParams({ project_key: projectKey, jql_query: jqlQuery })
+        });
+
+        const data = await response.json();
+        statusDiv.textContent = data.message;
+        statusDiv.className = 'status-message ' + data.status;
+      } catch (error) {
+        console.error(error);
+        statusDiv.textContent = 'Error connecting to the server.';
+        statusDiv.className = 'status-message error';
+      } finally {
+        ingestButton.disabled = false;
+        ingestButton.textContent = 'Ingest Data';
+      }
+    });
+
+    document.getElementById('searchForm').addEventListener('submit', async function(event) {
+      event.preventDefault();
+      const issueDescription = document.getElementById('issue_description').value;
+      const projectKeySearch = document.getElementById('project_key_search').value;
+      const searchStatusDiv = document.getElementById('searchStatus');
+      const searchButton = document.getElementById('searchButton');
+      const ticketList = document.getElementById('ticketList');
+      const solutionOutput = document.getElementById('solutionOutput');
+
+      searchStatusDiv.textContent = 'Searching...';
+      searchStatusDiv.className = 'status-message';
+      searchButton.disabled = true;
+      searchButton.textContent = 'Searching...';
+      ticketList.innerHTML = '';
+      solutionOutput.textContent = '';
+
+      try {
+        const response = await fetch('/search_and_summarize', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+          body: new URLSearchParams({ issue_description: issueDescription, project_key_search: projectKeySearch })
+        });
+
+        const data = await response.json();
+        searchStatusDiv.textContent = data.message;
+        searchStatusDiv.className = 'status-message ' + data.status;
+
+        if (data.status === 'success') {
+          if (data.similar_tickets && data.similar_tickets.length > 0) {
+            data.similar_tickets.forEach(ticket => {
+              const li = document.createElement('li');
+              li.innerHTML = `<a href="${ticket.link}" target="_blank">${ticket.ticket_id}: ${ticket.summary}</a>`;
+              ticketList.appendChild(li);
+            });
+          } else {
+            ticketList.innerHTML = '<li>No similar tickets found.</li>';
+          }
+          solutionOutput.textContent = data.solution;
+        } else {
+          solutionOutput.textContent = data.solution || 'An error occurred.';
+          solutionOutput.classList.add('error');
+        }
+      } catch (error) {
+        console.error(error);
+        searchStatusDiv.textContent = 'Network error.';
+        searchStatusDiv.className = 'status-message error';
+        solutionOutput.textContent = 'No solution available.';
+      } finally {
+        searchButton.disabled = false;
+        searchButton.textContent = 'Search & Summarize';
+      }
+    });
+  </script>
+</body>
+</html>
