@@ -1,0 +1,23 @@
+stages:
+  - build
+  - deploy
+
+Build:
+  image: python:3.8-slim-buster
+  stage: build
+  tags:
+    - <runner_tag>
+  script:
+    - sh build.sh
+  when : manual
+  
+Deploy:
+  image: docker:latest
+  stage: deploy
+  tags:
+    - <runner_tag>
+  before_script:
+    - docker container inspect ai_jira_assistant$RGA_PORT > /dev/null 2>&1 && docker container rm -f ai_jira_assistant$RGA_PORT
+  script:
+    - sh run.sh &
+  when: manual  
